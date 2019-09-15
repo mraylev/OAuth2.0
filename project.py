@@ -1,5 +1,4 @@
 from flask import Flask, render_template, request, redirect,jsonify, url_for, flash
-app = Flask(__name__)
 
 from sqlalchemy import create_engine, asc
 from sqlalchemy.orm import sessionmaker
@@ -15,8 +14,11 @@ import json
 from flask import make_response
 import requests
 
+app = Flask(__name__)
+
 CLIENT_ID = json.loads(
     open('client_secrets.json', 'r').read())['web']['client_id']
+APPLICATION_NAME = "restaurant_menu_app"
 
 #Connect to Database and create database session
 engine = create_engine('sqlite:///restaurantmenu.db')
@@ -32,15 +34,83 @@ def showLogin():
     state = ''.join(random.choice(string.ascii_uppercase + string.digits)
         for x in xrange(32))
     login_session['state'] = state
-    return render_template('login.html')
+    return render_template('login.html', CLIENT_ID = CLIENT_ID)
 
+# [Step 4] Make route and function that accepts POST requests
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
+    # [Step 5] Confirm token that the client sends to the server matches the token that the server sends to the client
     if request.args.get('state') != login_session['state']:
         response = make_response(json.dumps('Invalid state parameter'), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+    # [Step 6] Collect one-time code, if codes match
+    code = request.data
+    try:
+        # [Step 7] Upgrade the authorization code into a credentials object
+        oauth_flow = flow_from_clientsecrets('client_secrets.json',   scope='')
+        oauth_flow.redirect_uri = 'postmessage'
+        credentials = oauth_flow.step2_exchange(code)
+    except FlowExchangeError:
+        # [Step 8] Return error if credentials object cannot be created
+        response = make_response(json.dumps('Failed to upgrade the authorization code.'), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+    # [Step 9] Store credentials in variable called access_token
+    access_token = credentials.access_token
+    url = ('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=%s' % access_token)
+    h = httplib2.Http()
+    result = json.loads(h.request(url, 'GET')[1])
+    # If there was an error in the access token info, abort
+    if result.get('error') is not None:
+        response = make_response(json.dumps(result.get('error')), 500)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+    # [Step 10] Check that the access token is valid
+    gplus_id = credentials.is_token['sub']
+    # Verify that the access token is used for the intended user
+    if result['user_id'] != gplus_id:
+        response = make_response(json.dumps("Token's user ID doesn't match given user", 401))
         response.headers['Content-Type'] = 'applications/json'
         return response
-    code = request.data
+    # Verify that the access token is valid for this app
+    if result['issued_to'] != CLIENT_ID:
+        response = make_response(json.dumps("Token's client ID does not match app's ID"), 401)
+        print "Token's client ID does not match app's"
+        response.headers['Content-Type'] = 'applications/json'
+        return response
+    # [Step 11] Check to see if the user is already logged in
+    stored_credentials = login_session.get('credentials')
+    stored_gplus_id = login_session.get('gplus_id')
+    if stored_credentials is not None and gplus_id == stored_gplus_id:
+        response = make_response(json.dumps('Current user is already connected', 200))
+        response.headers['content-type'] = 'application/json'
+
+    # [Step 12] Store the access token in the session for later use
+    login_session['credentials'] = credentials
+    login_session['gplus_id'] = gplus_id
+
+    # [Step 13] Get User Info
+    userinfo_url = "https://googleapis.com/oauth2/v1/userinfo"
+    params = {'access_token' : credentials.access_token, 'alt' : 'json'}
+    answer = requests.get(userinfo_url, params = params)
+    data = json.loads(answer.text)
+
+    # [Step 14] Store relevant data from User Info
+    login_session['username'] = data['name']
+    login_session['picture'] = data['picture']
+    login_session['email'] = data['email']
+
+    # [Step 15] Create response that knows user's name and can return their picture
+    output = ''
+    output += '<h1>Welcome, '
+    output += login_session['username']
+    output += '!</h1>'
+    output += '<img src="'
+    output += login_session['picture']
+    output += '" style="width:300px; height 300px; border-radius: 150px; -webkit-border-radius:150px; -moz-border-radius: 150px">'
+    flash("you are now logged in as %s"%login_session['username'])
+    return output
 
 #JSON APIs to view Restaurant Information
 @app.route('/restaurant/<int:restaurant_id>/menu/JSON')
@@ -170,4 +240,4 @@ def deleteMenuItem(restaurant_id,menu_id):
 if __name__ == '__main__':
   app.secret_key = 'super_secret_key'
   app.debug = True
-  app.run(host = '0.0.0.0', port = 5000)
+  app.run(host = '0.0.0.0', port = 5005, threaded=False)
