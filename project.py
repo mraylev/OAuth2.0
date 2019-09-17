@@ -86,13 +86,17 @@ def gconnect():
         response = make_response(json.dumps('Current user is already connected', 200))
         response.headers['content-type'] = 'application/json'
     # [Step 12] Store the access token in the session for later use
-    login_session['credentials'] = credentials
+    login_session['credentials'] = credentials.to_json()
     login_session['gplus_id'] = gplus_id
     # [Step 13] Get User Info
-    userinfo_url = "https://googleapis.com/oauth2/v1/userinfo"
-    params = {'access_token':credentials.access_token, 'alt':'json'}
-    answer = requests.get(userinfo_url, params = params)
-    data = json.loads(answer.text)
+    #userinfo_url = "https://googleapis.com/oauth2/v2/userinfo"
+
+    #params = {'access_token':credentials.access_token, 'alt':'json'}
+    answer = requests.get("https://googleapis.com/oauth2/v2/userinfo", headers={"Authorization": credentials.access_token})
+    print(answer.content)
+    return "test"
+    """
+    data = answer.json()
     # [Step 14] Store relevant data from User Info
     login_session['username'] = "Mary" #data["name"]
     login_session['picture'] = data["picture"]
@@ -107,7 +111,7 @@ def gconnect():
     output += '" style="width:300px; height 300px; border-radius: 150px; -webkit-border-radius:150px; -moz-border-radius: 150px">'
     flash("you are now logged in as %s"%login_session['username'])
     return render_template('login.html', output = output)
-
+    """
 @app.route("/gdisconnect")
 def gdisconnect():
   #Only disconnect a connected user.
