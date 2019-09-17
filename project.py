@@ -89,14 +89,13 @@ def gconnect():
     login_session['credentials'] = credentials.to_json()
     login_session['gplus_id'] = gplus_id
     # [Step 13] Get User Info
-    #userinfo_url = "https://googleapis.com/oauth2/v2/userinfo"
+    userinfo_url = "https://googleapis.com/oauth2/v2/userinfo"
 
-    #params = {'access_token':credentials.access_token, 'alt':'json'}
-    answer = requests.get("https://googleapis.com/oauth2/v2/userinfo", headers={"Authorization": credentials.access_token})
-    print(answer.content)
-    return "test"
-    """
+    #params = {'access_token':credentials.access_tokenansw, 'alt':'json'}
+    answer = requests.get("https://googleapis.com/oauth2/v2/userinfo", params=params)
+    params = {'access_token': credentials.access_token, 'alt': 'json'}
     data = answer.json()
+
     # [Step 14] Store relevant data from User Info
     login_session['username'] = "Mary" #data["name"]
     login_session['picture'] = data["picture"]
@@ -111,7 +110,7 @@ def gconnect():
     output += '" style="width:300px; height 300px; border-radius: 150px; -webkit-border-radius:150px; -moz-border-radius: 150px">'
     flash("you are now logged in as %s"%login_session['username'])
     return render_template('login.html', output = output)
-    """
+
 @app.route("/gdisconnect")
 def gdisconnect():
   #Only disconnect a connected user.
