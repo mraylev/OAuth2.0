@@ -95,7 +95,7 @@ def gconnect():
     data = answer.json()
 
     # [Step 14] Store relevant data from User Info
-    login_session['username'] = "Mary" #data["name"]
+    login_session['username'] = data["name"]
     login_session['picture'] = data["picture"]
     login_session['email'] = data["email"]
     # [Step 15] Create response that knows user's name and can return their picture
